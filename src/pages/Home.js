@@ -1,31 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import apiClient from '../services/api';
+import React from 'react';
+import { useProducts, usePrefetchProductDetail } from '../hooks/useQueries';
 import ProductCard from '../components/ProductCard';
 
-// Componentes de MUI
 import Grid from '@mui/material/Grid';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
+import Alert from '@mui/material/Alert';
 
 const Home = () => {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: products = [], isLoading, error } = useProducts();
+  const prefetchProductDetail = usePrefetchProductDetail();
 
-  useEffect(() => {
-    apiClient.get('/productos/')
-      .then(response => {
-        setProducts(response.data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error("Error al cargar productos:", error);
-        setLoading(false);
-      });
-  }, []); 
-
-  if (loading) {
+  if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <CircularProgress size={60} />
@@ -33,9 +21,18 @@ const Home = () => {
     );
   }
 
+  if (error) {
+    return (
+      <Box sx={{ py: 3 }}>
+        <Alert severity="error">
+          Error al cargar productos: {error.message}
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ flexGrow: 1 }}>
-      {/* Hero Banner */}
       <Box
         sx={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -70,7 +67,6 @@ const Home = () => {
         </Box>
       </Box>
 
-      {/* Título de Productos */}
       <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Typography 
           variant="h4" 
@@ -98,7 +94,6 @@ const Home = () => {
         </Typography>
       </Box>
 
-      {/* Grid de Productos */}
       {products.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Typography variant="h5" color="text.secondary">
@@ -108,7 +103,15 @@ const Home = () => {
       ) : (
         <Grid container spacing={3} sx={{ mb: 4 }}>
           {products.map((product) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
+            <Grid 
+              item 
+              xs={12} 
+              sm={6} 
+              md={4} 
+              lg={3} 
+              key={product.id}
+              onMouseEnter={() => prefetchProductDetail(product.id)}
+            >
               <ProductCard product={product} />
             </Grid>
           ))}

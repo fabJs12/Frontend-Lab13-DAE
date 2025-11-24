@@ -1,8 +1,7 @@
-import React from 'react';
-import { useCart } from '../context/CartContext';
+import React, { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { useCart, useIncreaseQuantity, useDecreaseQuantity, useRemoveFromCart } from '../hooks/useQueries';
 
-// Componentes de MUI
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import List from '@mui/material/List';
@@ -17,12 +16,45 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import Paper from '@mui/material/Paper';
 import Grid from '@mui/material/Grid';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 
 const Cart = () => {
-  const { cartItems, removeFromCart } = useCart();
+  const { data: cartData, isLoading: cartLoading, error: cartError } = useCart();
+  const removeMutation = useRemoveFromCart();
+  const increaseQuantity = useIncreaseQuantity();
+  const decreaseQuantity = useDecreaseQuantity();
 
-  // Calcula el total
-  const total = cartItems.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+  const cartItems = cartData?.items || [];
+
+  const total = cartItems.reduce((acc, item) => {
+    const precio = item.producto_precio || item.precio || 0;
+    const cantidad = item.cantidad || 0;
+    return acc + (Number(precio) * cantidad);
+  }, 0);
+
+  if (cartLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress size={60} />
+      </Box>
+    );
+  }
+
+  if (cartError) {
+    return (
+      <Box sx={{ py: 3 }}>
+        <Alert severity="error">
+          Error al cargar el carrito: {cartError.message}
+        </Alert>
+        <Button component={RouterLink} to="/" variant="contained" sx={{ mt: 2 }}>
+          Volver a Inicio
+        </Button>
+      </Box>
+    );
+  }
 
   if (cartItems.length === 0) {
     return (
@@ -73,7 +105,6 @@ const Cart = () => {
       </Typography>
       
       <Grid container spacing={3}>
-        {/* Lista de Productos */}
         <Grid item xs={12} md={8}>
           <Paper 
             sx={{ 
@@ -86,11 +117,68 @@ const Cart = () => {
               {cartItems.map((item, index) => (
                 <React.Fragment key={item.id}>
                   <ListItem
-                    secondaryAction={
+                    sx={{
+                      py: 2,
+                      px: 2,
+                      backgroundColor: index % 2 === 0 ? '#fafafa' : 'white',
+                      alignItems: 'flex-start'
+                    }}
+                  >
+                    <ListItemAvatar sx={{ mr: 2, minWidth: 'auto' }}>
+                      <Avatar
+                        variant="rounded"
+                        src={item.producto_imagen || item.imagen_url || 'https://via.placeholder.com/100'}
+                        alt={item.producto_nombre || item.nombre}
+                        sx={{ width: 100, height: 100 }}
+                      />
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#333' }}>
+                          {item.producto_nombre || item.nombre}
+                        </Typography>
+                      }
+                      secondary={
+                        <Box sx={{ mt: 1 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Precio unitario: <span style={{ fontWeight: 600, color: '#667eea' }}>
+                              S/ {Number(item.producto_precio || item.precio).toFixed(2)}
+                            </span>
+                          </Typography>
+                          <Typography variant="body1" sx={{ mt: 1, fontWeight: 700, color: '#764ba2' }}>
+                            Subtotal: S/ {(item.cantidad * Number(item.producto_precio || item.precio)).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ flex: 1 }}
+                    />
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => decreaseQuantity.mutate(item.id, item.cantidad)}
+                        disabled={decreaseQuantity.isPending || item.cantidad === 1}
+                        sx={{ color: '#667eea' }}
+                      >
+                        <RemoveIcon fontSize="small" />
+                      </IconButton>
+                      <Typography sx={{ minWidth: 30, textAlign: 'center', fontWeight: 600 }}>
+                        {item.cantidad}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => increaseQuantity.mutate(item.id, item.cantidad)}
+                        disabled={increaseQuantity.isPending}
+                        sx={{ color: '#667eea' }}
+                      >
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                      <Divider orientation="vertical" variant="middle" flexItem />
                       <IconButton 
                         edge="end" 
-                        aria-label="delete" 
-                        onClick={() => removeFromCart(item.id)}
+                        size="small"
+                        onClick={() => removeMutation.mutate(item.id)}
+                        disabled={removeMutation.isPending}
                         sx={{
                           color: '#f44336',
                           '&:hover': {
@@ -98,43 +186,9 @@ const Cart = () => {
                           }
                         }}
                       >
-                        <DeleteIcon />
+                        <DeleteIcon fontSize="small" />
                       </IconButton>
-                    }
-                    sx={{
-                      py: 2,
-                      px: 2,
-                      backgroundColor: index % 2 === 0 ? '#fafafa' : 'white'
-                    }}
-                  >
-                    <ListItemAvatar sx={{ mr: 2 }}>
-                      <Avatar
-                        variant="rounded"
-                        src={item.imagen_url || 'https://via.placeholder.com/100'}
-                        alt={item.nombre}
-                        sx={{ width: 100, height: 100 }}
-                      />
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#333' }}>
-                          {item.nombre}
-                        </Typography>
-                      }
-                      secondary={
-                        <Box sx={{ mt: 1 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            Precio unitario: <span style={{ fontWeight: 600, color: '#667eea' }}>S/ {Number(item.precio).toFixed(2)}</span>
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Cantidad: <span style={{ fontWeight: 600, color: '#333' }}>{item.cantidad}</span>
-                          </Typography>
-                          <Typography variant="body1" sx={{ mt: 1, fontWeight: 700, color: '#764ba2' }}>
-                            Subtotal: S/ {(item.cantidad * item.precio).toFixed(2)}
-                          </Typography>
-                        </Box>
-                      }
-                    />
+                    </Box>
                   </ListItem>
                   {index < cartItems.length - 1 && <Divider />}
                 </React.Fragment>
@@ -143,7 +197,6 @@ const Cart = () => {
           </Paper>
         </Grid>
 
-        {/* Resumen de Compra */}
         <Grid item xs={12} md={4}>
           <Paper
             sx={{
@@ -161,7 +214,6 @@ const Cart = () => {
             </Typography>
             <Divider sx={{ backgroundColor: 'rgba(255,255,255,0.3)', mb: 2 }} />
 
-            {/* Detalles */}
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
                 <Typography variant="body1">Artículos:</Typography>
@@ -183,7 +235,6 @@ const Cart = () => {
 
             <Divider sx={{ backgroundColor: 'rgba(255,255,255,0.3)', my: 2 }} />
 
-            {/* Total */}
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
                 Total:
@@ -193,7 +244,6 @@ const Cart = () => {
               </Typography>
             </Box>
 
-            {/* Botones */}
             <Button
               fullWidth
               variant="contained"

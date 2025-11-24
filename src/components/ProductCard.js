@@ -36,7 +36,6 @@ const ProductCard = ({ product }) => {
         overflow: 'hidden'
       }}
     >
-      {/* Etiqueta de stock */}
       {isOutOfStock && (
         <Box
           sx={{

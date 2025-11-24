@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import apiClient from '../services/api';
+import { useProductDetail, useAddToCart } from '../hooks/useQueries';
 import { useCart } from '../context/CartContext';
 
 import Box from '@mui/material/Box';
@@ -12,29 +12,37 @@ import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
+import Alert from '@mui/material/Alert';
 
 const ProductDetail = () => {
   const { id } = useParams();
-  const { addToCart } = useCart();
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: product, isLoading, error } = useProductDetail(id);
+  const addToCartMutation = useAddToCart();
+  const { addToCart } = useCart(); // para actualizar contexto local
+  const [quantity, setQuantity] = useState(1);
+  const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    apiClient.get(`/productos/${id}/`)
-      .then(response => {
-        setProduct(response.data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error("Error al cargar el producto:", error);
-        setLoading(false);
-      });
-  }, [id]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <CircularProgress size={60} />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 4 }}>
+        <Alert severity="error">Error al cargar el producto</Alert>
+        <Button 
+          component={RouterLink} 
+          to="/"
+          startIcon={<ArrowBackIcon />}
+          variant="contained"
+          sx={{ mt: 2 }}
+        >
+          Volver a Inicio
+        </Button>
       </Box>
     );
   }
@@ -57,6 +65,27 @@ const ProductDetail = () => {
 
   const stock = product.stock ?? 0;
   const isOutOfStock = stock === 0;
+  const precio = product.precio ?? product.price ?? 0;
+  const imagen = product.imagen_url || product.image || 'https://via.placeholder.com/600x400';
+  const nombre = product.nombre || product.name || 'Sin nombre';
+
+  const handleAddToCart = () => {
+    // Optimistic update en React Query
+    addToCartMutation.mutate(
+      { productId: parseInt(id), quantity },
+      {
+        onSuccess: () => {
+          // También actualizar el contexto local
+          for (let i = 0; i < quantity; i++) {
+            addToCart(product);
+          }
+          setMessage(`✓ ${nombre} añadido al carrito`);
+          setTimeout(() => setMessage(''), 3000);
+          setQuantity(1);
+        },
+      }
+    );
+  };
 
   return (
     <Box sx={{ flexGrow: 1, py: 3 }}>
@@ -69,6 +98,12 @@ const ProductDetail = () => {
       >
         Volver a productos
       </Button>
+
+      {message && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          {message}
+        </Alert>
+      )}
 
       <Grid container spacing={4}>
         {/* Columna de la Imagen */}
@@ -92,8 +127,8 @@ const ProductDetail = () => {
                   transform: 'scale(1.05)'
                 }
               }}
-              alt={product.nombre}
-              src={product.imagen_url || 'https://via.placeholder.com/600x400'}
+              alt={nombre}
+              src={imagen}
             />
             {isOutOfStock && (
               <Box
@@ -127,7 +162,7 @@ const ProductDetail = () => {
               gutterBottom
               sx={{ fontWeight: 700, color: '#333', mb: 1 }}
             >
-              {product.nombre}
+              {nombre}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
               <Chip 
@@ -159,7 +194,7 @@ const ProductDetail = () => {
                 fontSize: { xs: '2.5rem', md: '3rem' }
               }}
             >
-              S/ {Number(product.precio).toFixed(2)}
+              S/ {Number(precio).toFixed(2)}
             </Typography>
           </Box>
 
@@ -173,14 +208,42 @@ const ProductDetail = () => {
             </Typography>
           </Box>
 
+          {/* Controles de cantidad */}
+          <Box sx={{ mb: 3, pb: 3, borderBottom: '2px solid #eee' }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: '#333' }}>
+              Cantidad
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                disabled={quantity === 1 || isOutOfStock}
+                sx={{ minWidth: 40 }}
+              >
+                −
+              </Button>
+              <Typography sx={{ minWidth: 40, textAlign: 'center', fontWeight: 600, fontSize: '1.2rem' }}>
+                {quantity}
+              </Typography>
+              <Button
+                variant="outlined"
+                onClick={() => setQuantity(Math.min(stock, quantity + 1))}
+                disabled={quantity >= stock || isOutOfStock}
+                sx={{ minWidth: 40 }}
+              >
+                +
+              </Button>
+            </Box>
+          </Box>
+
           {/* Botón Añadir al Carrito */}
           <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
             <Button
               variant={isOutOfStock ? 'outlined' : 'contained'}
               size="large"
               startIcon={<AddShoppingCartIcon />}
-              onClick={() => addToCart(product)}
-              disabled={isOutOfStock}
+              onClick={handleAddToCart}
+              disabled={isOutOfStock || addToCartMutation.isPending}
               sx={{
                 flex: 1,
                 background: isOutOfStock ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -195,7 +258,7 @@ const ProductDetail = () => {
                 }
               }}
             >
-              {isOutOfStock ? 'No Disponible' : 'Añadir al Carrito'}
+              {addToCartMutation.isPending ? 'Agregando...' : isOutOfStock ? 'No Disponible' : 'Añadir al Carrito'}
             </Button>
           </Box>
 

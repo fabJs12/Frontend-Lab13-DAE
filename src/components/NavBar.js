@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { usePrefetchCategoryProducts } from '../hooks/useQueries';
 
-// Componentes de Material-UI
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -15,7 +15,8 @@ import GamesIcon from '@mui/icons-material/Games';
 
 const Navbar = () => {
   const { cartItems } = useCart();
-  // Calcula el total de items en el carrito
+  const prefetchCategoryProducts = usePrefetchCategoryProducts();
+
   const totalItems = cartItems.reduce((total, item) => total + item.cantidad, 0);
 
   return (
@@ -54,6 +55,15 @@ const Navbar = () => {
             sx={{ fontSize: '1rem', fontWeight: 500, '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
           >
             Inicio
+          </Button>
+          
+          <Button 
+            color="inherit" 
+            component={RouterLink} 
+            to="/categorias"
+            sx={{ fontSize: '1rem', fontWeight: 500, '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' } }}
+          >
+            Categorías
           </Button>
           
           <IconButton
